@@ -1,0 +1,27 @@
+[project]
+name = "f1-predictions"
+version = "0.1.0"
+description = "Formula 1 prediction model"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = [
+    "fastf1>=3.8",
+    "pandas>=2.3",
+    "numpy>=2.0",
+    "requests>=2.34",
+    "matplotlib>=3.10",
+]
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest"]
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

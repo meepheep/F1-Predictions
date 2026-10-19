@@ -1,11 +1,6 @@
-# src/ingest/db.py
 import sqlite3
-from pathlib import Path
 
-DB_PATH = Path("data/db/f1.db")
-conn = sqlite3.connect(DB_PATH)
-connection = sqlite3.Connection(DB_PATH)
-cursor = connection.cursor()
+from f1_predictions.config import DB_PATH
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS race_results (
@@ -21,6 +16,12 @@ CREATE TABLE IF NOT EXISTS race_results (
 );
 """
 
-cursor = cursor.execute(SCHEMA)
-#conn.execute("DELETE FROM race_results")
-#conn.commit()
+
+def connect() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    return sqlite3.connect(DB_PATH)
+
+
+def init_db() -> None:
+    with connect() as conn:
+        conn.executescript(SCHEMA)

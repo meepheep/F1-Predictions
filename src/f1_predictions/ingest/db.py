@@ -6,6 +6,9 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS race_results (
     season INTEGER,
     round INTEGER,
+    status TEXT,
+    points REAL,
+    positionText TEXT,
     raceDate TEXT,
     circuitId TEXT,
     driverId TEXT,

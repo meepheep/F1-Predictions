@@ -3,19 +3,23 @@ import time
 import pandas as pd
 from fastf1.ergast import Ergast
 from fastf1.exceptions import ErgastInvalidRequestError
+from tqdm import tqdm
 
 from f1_predictions.config import enable_fastf1_cache
 from f1_predictions.ingest import db
 
 RESULT_COLUMNS = [
-    "season",
-    "round",
-    "raceDate",
-    "circuitId",
-    "driverId",
-    "constructorId",
-    "grid",
-    "position",
+    'season',
+    'round',
+    'raceDate',
+    'circuitId',
+    'driverId',
+    'constructorId',
+    'grid',
+    'position',
+    'status',
+    'points',
+    'positionText'
 ]
 
 
@@ -27,7 +31,7 @@ def fetch_with_retry(func, *args, max_retries=5, base_delay=2, **kwargs):
         except ErgastInvalidRequestError as e:
             if "Too Many Requests" in str(e):
                 wait = base_delay * (2**attempt)  # 2s, 4s, 8s, 16s, 32s
-                print(f"Rate limited on attempt {attempt + 1}, waiting {wait}s...")
+                tqdm.write(f"Rate limited on attempt {attempt + 1}, waiting {wait}s...")
                 time.sleep(wait)
             else:
                 raise  # a different kind of invalid request — don't retry blindly, surface it
@@ -37,13 +41,20 @@ def fetch_with_retry(func, *args, max_retries=5, base_delay=2, **kwargs):
 def main(seasons=range(2021, 2027)):
     enable_fastf1_cache()
     db.init_db()
-    ergast = Ergast(result_type="pandas", auto_cast=True)
+    ergast = Ergast(result_type="pandas", auto_cast=True, limit=None)
     conn = db.connect()
+    rounds = []
 
     for season in seasons:
-        schedule = ergast.get_race_schedule(season=season)
-        for _, race_meta in schedule.iterrows():
-            round_num = int(race_meta["round"])
+       schedule = ergast.get_race_schedule(season=season)
+       rounds.extend(schedule[["season", "round", "raceDate"]].values.tolist())
+
+    loaded = conn.execute("SELECT DISTINCT season, round FROM race_results").fetchall()
+    loaded_set = set(loaded)
+    rounds = [r for r in rounds if tuple(r[:2]) not in loaded_set] # only fetch rounds that are not already in the database
+    rounds = [r for r in rounds if pd.to_datetime(r[2]) < pd.Timestamp.now()] # only fetch rounds that have already happened
+    
+    for season, round_num, raceDate in tqdm(rounds, desc="Ingesting", unit="round"):
             try:
                 results = fetch_with_retry(ergast.get_race_results, season=season, round=round_num)
                 time.sleep(1.5)
@@ -61,7 +72,7 @@ def main(seasons=range(2021, 2027)):
                 results_df = results_df[RESULT_COLUMNS]
                 results_df.to_sql("race_results", conn, if_exists="append", index=False)
             except Exception as e:
-                print(f"Failed on season {season} round {round_num}: {e}")
+                tqdm.write(f"Failed on season {season} round {round_num}: {e}")
                 time.sleep(2)
 
     conn.close()

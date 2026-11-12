@@ -31,8 +31,11 @@ walk-forward backtest before any dashboard work starts.
 
 ## Next steps
 
-### Step 2: Features (`src/f1_predictions/features/build.py`), NEXT
-- [ ] Load both tables and merge them on `(season, round, driverId)`.
+### Step 2: Features (`src/f1_predictions/features/build.py`), IN PROGRESS
+- [x] Load both tables and merge them on `(season, round, driverId)`. Done in
+      `features/merge_tables.py`: left join from race results, suffixes `_race`/`_quali`.
+      Still to tidy: it runs at import time (wrap it in a function like `load_tables()` so
+      `build.py` and tests can reuse it), and the connection is never closed.
 - [ ] First feature end to end: the driver's average finish over the previous 3 races. Sort by
       date, group by driver, and `shift(1)` before `rolling()` so a race's own result never leaks in.
 - [ ] Qualifying/grid position, treating grid 0 as last.
@@ -50,7 +53,7 @@ walk-forward backtest before any dashboard work starts.
 - [ ] Save models with joblib to `data/processed/models/`.
 
 ### Step 4: Walk-forward backtest (`src/f1_predictions/evaluate/backtest.py`)
-- [ ] For each race in 2024–2026, train only on earlier races and predict that race. Never split
+- [ ] For each race in 2024â€“2026, train only on earlier races and predict that race. Never split
       randomly.
 - [ ] Report MAE, Spearman rank correlation per race, podium hit rate and Brier score, for the model
       and the baseline side by side.
@@ -65,5 +68,8 @@ walk-forward backtest before any dashboard work starts.
 
 Add one line per working session, newest first.
 
+- 2026-11-12: Fixed `ModuleNotFoundError` (reran `pip install -e ".[dev]"` in `.venv`). Loaded and
+  merged both tables in `features/merge_tables.py`. README brought up to date. Next: rolling
+  3-race finish feature.
 - 2026-11-12: Finished ingestion: qualifying table, generic `fetch_results()`, season range up to
   the current year, ruff formatting. Next up is Step 2.

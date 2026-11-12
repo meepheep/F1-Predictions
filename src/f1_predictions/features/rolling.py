@@ -1,15 +1,23 @@
 import pandas as pd
 
 
+def add_grid_cleaned(df):
+    out = df.copy()
+    out["field_size"] = out.groupby(["season", "round"])["driverId"].transform("count")
+    out["grid_cleaned"] = out["grid"]
+    grid_mask = out["grid"] == 0
+    out.loc[grid_mask, "grid_cleaned"] = out.loc[grid_mask, "field_size"]
+    out.drop(columns=["field_size"], inplace=True)
+    return out
+
+
 def add_positions_gained(df):
-    df["field_size"] = df.groupby(["season", "round"])["driverId"].transform("count")
-    df["grid_cleaned"] = df["grid"]
-    grid_mask = df["grid"] == 0
-    df.loc[grid_mask, "grid_cleaned"] = df.loc[grid_mask, "field_size"]
-    df["positions_gained"] = df["grid_cleaned"] - df["position_race"]
-    finish_mask = ~df["positionText"].str.isdigit()
-    df.loc[finish_mask, "positions_gained"] = float("nan")
-    return df
+    out = df.copy()
+    out = add_grid_cleaned(out)
+    out["positions_gained"] = out["grid_cleaned"] - out["position_race"]
+    finish_mask = ~out["positionText"].str.isdigit()
+    out.loc[finish_mask, "positions_gained"] = float("nan")
+    return out
 
 
 def calculate_driver_rolling_finish(df, periods=5):

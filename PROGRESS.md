@@ -29,6 +29,8 @@ walk-forward backtest before any dashboard work starts.
   - `position` is filled in even for DNFs, so use `status` or `positionText` to find retirements.
   - Two qualifying rows have a Q3 time but no Q1 time (a gap in the source data).
 
+Modelling decisions and their reasons are in [DECISIONS.md](DECISIONS.md).
+
 ## Next steps
 
 ### Step 2: Features (`src/f1_predictions/features/build.py`), IN PROGRESS
@@ -50,8 +52,16 @@ walk-forward backtest before any dashboard work starts.
       include `test_input_is_not_modified`. `add_positions_gained` now writes `grid_cleaned`
       instead of overwriting `grid` (test checks `grid_cleaned == 4` and `grid` still 0). 22 pass,
       ruff clean.
-- [ ] NEXT: `features/build.py`: load once, sort once, call each feature as `add_xxx(df)`, merge
-      the team features back onto driver rows on `(season, round, constructorId)`.
+- [x] `features/build.py`: `build_rolling_features(df, periods=5)` merges the 4 rolling features
+      (driver on `driverId`, team on `constructorId`); `main()` runs it on the real DB (2718 rows,
+      no duplicate keys). Tests in `tests/test_build.py`; 29 pass.
+- [x] Column roles decided (see DECISIONS.md): target `position_race`; result-only `status`,
+      `points`, `positionText`; ids; ignore `season`, `round`, `raceDate`; everything else is a
+      feature.
+- [x] `grid_cleaned` in the build output via `rolling.add_grid_cleaned()` (reused by
+      `add_positions_gained`); tested in `test_build.py`. 30 pass.
+- [ ] NEXT: save to parquet (keep all columns; drop the ignored/result/id columns only when building
+      the model's X).
 - [ ] Qualifying/grid position, treating grid 0 as last.
 - [ ] Driver DNF rate (rolling finish is done; window is the `periods` argument).
 - [ ] Constructor rolling points (rolling finish is done).
@@ -74,6 +84,8 @@ walk-forward backtest before any dashboard work starts.
       and the baseline side by side.
 
 ### Step 5: Later
+- [ ] Qualifying gap feature: each driver's qualifying time relative to the session's fastest
+      (comparable across circuits, unlike raw q1/q2/q3). Add it to the leakage test.
 - [ ] Practice-session pace features from FastF1 (FP2 long runs); `tests/fixtures/laps_sample.csv`
       can be the test fixture.
 - [ ] `serve/predict.py`: a function `predict_race(season, round) -> DataFrame`.
@@ -83,6 +95,8 @@ walk-forward backtest before any dashboard work starts.
 
 Add one line per working session, newest first.
 
+- 2026-11-12: Wrote `features/build.py` (merges all rolling features); added `tests/test_build.py`
+  (29 pass). Next: choose output columns, save parquet, then the grid baseline.
 - 2026-11-12: Fixed broken test table (commit 4601462). Refactored `rolling.py` to take a
   DataFrame and not modify its input; tests rewritten to match; `grid_cleaned` instead of overwriting `grid` (22 pass).
   Next: `build.py`.

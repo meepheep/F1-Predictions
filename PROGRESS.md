@@ -36,22 +36,30 @@ walk-forward backtest before any dashboard work starts.
       `features/merge_tables.py` as `load_merged()`: left join from race results, only the
       qualifying columns needed, suffixes `_race`/`_quali` (so `position_race`, `position_quali`).
 - [x] First feature end to end: the driver's average finish over the previous 3 races, in
-      `features/avg_finish.py`. Pattern: sort by date, then
+      `features/rolling.py`. Pattern: sort by date, then
       `groupby("driverId")[col].transform(lambda s: s.shift(1).rolling(n, min_periods=1).mean())`.
 - [x] Driver rolling positions gained (`add_positions_gained`: grid 0 -> field size, non-numeric
       `positionText` -> NaN). Tests in `tests/test_features.py` pass for all driver features.
 - [x] Team rolling finish and positions gained: aggregate to one row per team per race first,
       then shift/roll (otherwise the teammate's same-race result leaks in). All feature tests pass,
       including the leakage test.
+- [x] Fixed `tests/test_features.py` (`COLUMNS` matches the 8-value `ROWS` and `load_merged()`
+      names again). 18 tests pass; ruff clean.
+- [x] Refactored `rolling.py`: each `calculate_*(df, periods=5)` takes a DataFrame, works on
+      `df.copy()`, and returns `driver_...`/`team_...` columns. Tests pass `make_df()` directly and
+      include `test_input_is_not_modified`. `add_positions_gained` now writes `grid_cleaned`
+      instead of overwriting `grid` (test checks `grid_cleaned == 4` and `grid` still 0). 22 pass,
+      ruff clean.
 - [ ] NEXT: `features/build.py`: load once, sort once, call each feature as `add_xxx(df)`, merge
       the team features back onto driver rows on `(season, round, constructorId)`.
 - [ ] Qualifying/grid position, treating grid 0 as last.
-- [ ] Driver rolling finish over 3 and 5 races, and DNF rate.
-- [ ] Constructor rolling finish and points.
+- [ ] Driver DNF rate (rolling finish is done; window is the `periods` argument).
+- [ ] Constructor rolling points (rolling finish is done).
 - [ ] Driver's history at this circuit.
 - [ ] Teammate qualifying gap.
 - [ ] Save to `data/processed/features.parquet` (add `pyarrow` to the dependencies).
-- [ ] Leakage test: changing round N's result must not change round N's features.
+- [x] Leakage test: changing round N's result must not change round N's features
+      (`test_no_leakage_from_same_race`). Extend it to each new feature.
 
 ### Step 3: Baseline and model (`src/f1_predictions/models/`)
 - [ ] Baseline: predicted finish = grid position.
@@ -75,9 +83,12 @@ walk-forward backtest before any dashboard work starts.
 
 Add one line per working session, newest first.
 
+- 2026-11-12: Fixed broken test table (commit 4601462). Refactored `rolling.py` to take a
+  DataFrame and not modify its input; tests rewritten to match; `grid_cleaned` instead of overwriting `grid` (22 pass).
+  Next: `build.py`.
+
 - 2026-11-12: Tidied `load_merged()`; rolling 3-race average finish works. Chose a rolling
   (not season) average for positions gained, as the next feature.
-
 - 2026-11-12: Fixed `ModuleNotFoundError` (reran `pip install -e ".[dev]"` in `.venv`). Loaded and
   merged both tables in `features/merge_tables.py`. README brought up to date. Next: rolling
   3-race finish feature.

@@ -1,8 +1,8 @@
-"""Tests for the rolling features in features/avg_finish.py.
+"""Tests for the rolling features in features/rolling.py.
 
 They use a small hand-made table (3 races, 2 teams, 2 drivers each) instead of the real database, so
-the expected numbers can be worked out by hand. `load_merged` is replaced with a function that
-returns this table.
+the expected numbers can be worked out by hand. Each feature function takes the table as its first
+argument, so the tests pass it in directly.
 """
 
 import pandas as pd
@@ -11,7 +11,7 @@ import pytest
 from f1_predictions.features import rolling
 
 # Rows are deliberately out of date order, so the functions must sort them themselves.
-#   race 1: d2 starts from the pit lane (grid 0, i.e. last of 4)
+#   race 1: b2 starts from the pit lane (grid 0, i.e. last of 4)
 #   race 2: a2 retires ("R")
 #   race 3: b2 is disqualified ("D")
 ROWS = [
@@ -32,32 +32,17 @@ ROWS = [
 COLUMNS = [
     "season",
     "round",
-    "status",
-    "points",
-    "positionText",
     "raceDate",
-    "circuitId",
     "driverId",
     "constructorId",
     "grid",
-    "position",
+    "position_race",
+    "positionText",
 ]
 
 
 def make_df():
     return pd.DataFrame(ROWS, columns=COLUMNS)
-
-
-@pytest.fixture
-def fake_db(monkeypatch):
-    """Make load_merged() return the hand-made table. Returns a setter to swap in edited data."""
-    data = {"df": make_df()}
-    monkeypatch.setattr(rolling.merge_tables, "load_merged", lambda: data["df"].copy())
-
-    def set_df(df):
-        data["df"] = df
-
-    return set_df
 
 
 def value(result, key_col, key, round_num, col):
@@ -80,7 +65,8 @@ def run_positions_gained():
 def test_pit_lane_start_counts_as_last():
     df = run_positions_gained()
     row = df[(df["driverId"] == "b2") & (df["round"] == 1)].iloc[0]
-    assert row["grid"] == 4  # field size of race 1
+    assert row["grid_cleaned"] == 4  # field size of race 1
+    assert row["grid"] == 0  # raw grid is left untouched
     assert row["positions_gained"] == 0  # started last (4th), finished 4th
 
 
@@ -102,23 +88,24 @@ def test_finishers_keep_positions_gained():
 # --- driver rolling features ---------------------------------------------------------------------
 
 
-def test_driver_rolling_finish(fake_db):
-    result = rolling.calculate_driver_rolling_finish(periods=5)
-    col = "rolling_pos_avg"
+def test_driver_rolling_finish():
+    result = rolling.calculate_driver_rolling_finish(make_df(), periods=5)
+    col = "driver_rolling_pos_avg"
     assert pd.isna(value(result, "driverId", "a1", 1, col))  # no earlier races
     assert value(result, "driverId", "a2", 2, col) == pytest.approx(3)  # race 1 only
     assert value(result, "driverId", "a2", 3, col) == pytest.approx(3.5)  # mean(3, 4)
     assert value(result, "driverId", "b1", 3, col) == pytest.approx(1.5)  # mean(2, 1)
 
 
-def test_driver_rolling_finish_respects_window(fake_db):
-    result = rolling.calculate_driver_rolling_finish(periods=1)
-    assert value(result, "driverId", "a2", 3, "rolling_pos_avg") == pytest.approx(4)  # race 2 only
+def test_driver_rolling_finish_respects_window():
+    result = rolling.calculate_driver_rolling_finish(make_df(), periods=1)
+    col = "driver_rolling_pos_avg"
+    assert value(result, "driverId", "a2", 3, col) == pytest.approx(4)  # race 2 only
 
 
-def test_driver_rolling_positions_gained(fake_db):
-    result = rolling.calculate_driver_rolling_positions_gained(periods=5)
-    col = "rolling_positions_gained_avg"
+def test_driver_rolling_positions_gained():
+    result = rolling.calculate_driver_rolling_positions_gained(make_df(), periods=5)
+    col = "driver_rolling_positions_gained_avg"
     assert pd.isna(value(result, "driverId", "b1", 1, col))
     assert value(result, "driverId", "b1", 3, col) == pytest.approx(1.5)  # mean(1, 2)
     assert value(result, "driverId", "b2", 3, col) == pytest.approx(0.5)  # mean(0 pit lane, 1)
@@ -128,9 +115,9 @@ def test_driver_rolling_positions_gained(fake_db):
 # --- team rolling features -----------------------------------------------------------------------
 
 
-def test_team_rolling_finish(fake_db):
-    result = rolling.calculate_team_rolling_finish(periods=5)
-    col = "rolling_pos_avg"
+def test_team_rolling_finish():
+    result = rolling.calculate_team_rolling_finish(make_df(), periods=5)
+    col = "team_rolling_pos_avg"
     assert len(result) == 6  # one row per team per race
     # team_a average finish per race: r1 2.0, r2 3.0
     assert pd.isna(value(result, "constructorId", "team_a", 1, col))
@@ -140,9 +127,9 @@ def test_team_rolling_finish(fake_db):
     assert value(result, "constructorId", "team_b", 3, col) == pytest.approx(2.5)
 
 
-def test_team_rolling_positions_gained(fake_db):
-    result = rolling.calculate_team_rolling_positions_gained(periods=5)
-    col = "rolling_positions_gained_avg"
+def test_team_rolling_positions_gained():
+    result = rolling.calculate_team_rolling_positions_gained(make_df(), periods=5)
+    col = "team_rolling_positions_gained_avg"
     assert len(result) == 6
     # team_a average positions gained per race: r1 -0.5, r2 0.0 (a2's DNF skipped)
     assert value(result, "constructorId", "team_a", 2, col) == pytest.approx(-0.5)
@@ -151,37 +138,46 @@ def test_team_rolling_positions_gained(fake_db):
     assert value(result, "constructorId", "team_b", 3, col) == pytest.approx(1.0)
 
 
-# --- leakage ---------------------------------------------------------------------------------------
+# --- leakage and input safety ------------------------------------------------------------------
 
 FEATURES = [
-    (rolling.calculate_driver_rolling_finish, "driverId", "rolling_pos_avg"),
+    (rolling.calculate_driver_rolling_finish, "driverId", "driver_rolling_pos_avg"),
     (
         rolling.calculate_driver_rolling_positions_gained,
         "driverId",
-        "rolling_positions_gained_avg",
+        "driver_rolling_positions_gained_avg",
     ),
-    (rolling.calculate_team_rolling_finish, "constructorId", "rolling_pos_avg"),
+    (rolling.calculate_team_rolling_finish, "constructorId", "team_rolling_pos_avg"),
     (
         rolling.calculate_team_rolling_positions_gained,
         "constructorId",
-        "rolling_positions_gained_avg",
+        "team_rolling_positions_gained_avg",
     ),
 ]
+FEATURE_IDS = [f[0].__name__ for f in FEATURES]
 
 
-@pytest.mark.parametrize("func, key_col, col", FEATURES, ids=[f[0].__name__ for f in FEATURES])
-def test_no_leakage_from_same_race(fake_db, func, key_col, col):
+@pytest.mark.parametrize("func, key_col, col", FEATURES, ids=FEATURE_IDS)
+def test_no_leakage_from_same_race(func, key_col, col):
     """Changing race 3's results must not change any race 3 feature: they may only use races 1-2."""
-    before = func(periods=5)
+    before = func(make_df(), periods=5)
 
     edited = make_df()
     race3 = edited["round"] == 3
     edited.loc[race3, "position_race"] = edited.loc[race3, "position_race"][::-1].values
     edited.loc[race3, "positionText"] = edited.loc[race3, "position_race"].astype(str)
-    fake_db(edited)
-    after = func(periods=5)
+    after = func(edited, periods=5)
 
     for key in before[key_col].unique():
         b = value(before, key_col, key, 3, col)
         a = value(after, key_col, key, 3, col)
         assert b == pytest.approx(a, nan_ok=True), f"{key}: race 3 feature changed from {b} to {a}"
+
+
+@pytest.mark.parametrize("func, key_col, col", FEATURES, ids=FEATURE_IDS)
+def test_input_is_not_modified(func, key_col, col):
+    """Feature functions must work on a copy and leave the caller's DataFrame exactly as it was."""
+    df = make_df()
+    original = df.copy()
+    func(df, periods=5)
+    pd.testing.assert_frame_equal(df, original)

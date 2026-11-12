@@ -4,8 +4,10 @@ A Formula 1 race prediction model built on [FastF1](https://docs.fastf1.dev/) se
 [Jolpica](https://github.com/jolpica/jolpica-f1) API (an Ergast-compatible replacement for the
 retired Ergast API).
 
-> **Status:** early development. Data ingestion works. Feature building is in progress (race and
-> qualifying tables load and merge). Models, evaluation and the dashboard are not yet implemented.
+> **Status:** early development. Data ingestion works. Feature building is in progress: race and
+> qualifying tables load and merge, and rolling driver and team features (average finish,
+> positions gained) are implemented and tested. Models, evaluation and the dashboard are not yet
+> implemented.
 
 ## Requirements
 
@@ -96,6 +98,8 @@ src/f1_predictions/   the package; all reusable logic lives here
   config.py           paths, API URL, User-Agent, FastF1 cache setup
   ingest/             pull data from FastF1 / Jolpica into SQLite
   features/           build model inputs from the database        (in progress)
+    merge_tables.py   load_merged(): race results left-joined with qualifying
+    rolling.py        rolling driver/team average finish and positions gained
   models/             train and predict                           (planned)
   evaluate/           backtests and metrics                       (planned)
   serve/              functions the dashboard calls               (planned)

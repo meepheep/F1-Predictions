@@ -82,7 +82,6 @@ def fetch_results(
 
 def main():
     fetch_results(
-        seasons=range(2021, datetime.now().year + 1),
         fetch_type="get_race_results",
         table_name="race_results",
         column_list=[
@@ -100,7 +99,6 @@ def main():
         ],
     )
     fetch_results(
-        seasons=range(2021, datetime.now().year + 1),
         fetch_type="get_qualifying_results",
         table_name="qualifying_results",
         column_list=[

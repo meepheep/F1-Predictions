@@ -1,4 +1,4 @@
-"""Tests for the rolling features in features/rolling.py.
+"""Tests for the rolling features in features/avg_finish.py.
 
 They use a small hand-made table (3 races, 2 teams, 2 drivers each) instead of the real database, so
 the expected numbers can be worked out by hand. `load_merged` is replaced with a function that
@@ -32,12 +32,15 @@ ROWS = [
 COLUMNS = [
     "season",
     "round",
+    "status",
+    "points",
+    "positionText",
     "raceDate",
+    "circuitId",
     "driverId",
     "constructorId",
     "grid",
-    "position_race",
-    "positionText",
+    "position",
 ]
 
 
@@ -70,7 +73,8 @@ def value(result, key_col, key, round_num, col):
 
 def run_positions_gained():
     df = make_df()
-    return rolling.add_positions_gained(df)
+    out = rolling.add_positions_gained(df)
+    return out if out is not None else df  # works whether it edits in place or returns the df
 
 
 def test_pit_lane_start_counts_as_last():

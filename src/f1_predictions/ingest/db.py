@@ -17,6 +17,20 @@ CREATE TABLE IF NOT EXISTS race_results (
     position INTEGER,
     PRIMARY KEY (season, round, driverId)
 );
+
+CREATE TABLE IF NOT EXISTS qualifying_results (
+    season INTEGER,
+    round INTEGER,
+    raceDate TEXT,
+    circuitId TEXT,
+    driverId TEXT,
+    constructorId TEXT,
+    position INTEGER,
+    q1 REAL,
+    q2 REAL,
+    q3 REAL,
+    PRIMARY KEY (season, round, driverId)
+);
 """
 
 

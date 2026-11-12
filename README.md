@@ -28,7 +28,7 @@ The editable install (`-e`) makes `f1_predictions` importable from anywhere in t
 Pull race results for the 2021–2026 seasons into a local SQLite database:
 
 ```bash
-python -m f1_predictions.ingest.ingest_race_data
+python -m f1_predictions.ingest.ingest
 ```
 
 This command:
@@ -39,9 +39,7 @@ This command:
 - caches raw API responses in `data/raw/fastf1_cache/`
 
 Rounds that fail are logged and skipped, so the rest of the run still finishes. Rows are appended,
-and `(season, round, driverId)` is the primary key. If you run the command again over seasons that
-are already loaded, those rounds will report duplicate-key failures. To rebuild from scratch,
-delete `data/db/f1.db` first.
+and `(season, round, driverId)` is the primary key.
 
 To pull a different range of seasons:
 
@@ -64,6 +62,22 @@ main(seasons=range(2018, 2021))
 | `constructorId` | TEXT    | Ergast constructor ID, e.g. `red_bull`   |
 | `grid`          | INTEGER | starting position (0 = pit lane start)   |
 | `position`      | INTEGER | finishing position                       |
+
+`qualifying_results`: one row per driver per race.
+
+| column          | type    | notes                                    |
+|-----------------|---------|------------------------------------------|
+| `season`        | INTEGER |                                          |
+| `round`         | INTEGER |                                          |
+| `raceDate`      | TEXT    |                                          |
+| `circuitId`     | TEXT    | Ergast circuit ID, e.g. `bahrain`        |
+| `driverId`      | TEXT    | Ergast driver ID, e.g. `max_verstappen`  |
+| `constructorId` | TEXT    | Ergast constructor ID, e.g. `red_bull`   |
+| `position`      | INTEGER | qualifying position (0 = pit lane start) |
+| `q1`            | REAL    | fastest q1 time                          |
+| `q2`            | REAL    | fastest q2 time                          |
+| `q3`            | REAL    | fastest q3 time                          |
+
 
 A quick check query is in [scripts/check_race_results.sql](scripts/check_race_results.sql).
 

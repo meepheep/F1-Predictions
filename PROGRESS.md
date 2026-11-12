@@ -33,11 +33,18 @@ walk-forward backtest before any dashboard work starts.
 
 ### Step 2: Features (`src/f1_predictions/features/build.py`), IN PROGRESS
 - [x] Load both tables and merge them on `(season, round, driverId)`. Done in
-      `features/merge_tables.py`: left join from race results, suffixes `_race`/`_quali`.
-      Still to tidy: it runs at import time (wrap it in a function like `load_tables()` so
-      `build.py` and tests can reuse it), and the connection is never closed.
-- [ ] First feature end to end: the driver's average finish over the previous 3 races. Sort by
-      date, group by driver, and `shift(1)` before `rolling()` so a race's own result never leaks in.
+      `features/merge_tables.py` as `load_merged()`: left join from race results, only the
+      qualifying columns needed, suffixes `_race`/`_quali` (so `position_race`, `position_quali`).
+- [x] First feature end to end: the driver's average finish over the previous 3 races, in
+      `features/avg_finish.py`. Pattern: sort by date, then
+      `groupby("driverId")[col].transform(lambda s: s.shift(1).rolling(n, min_periods=1).mean())`.
+- [x] Driver rolling positions gained (`add_positions_gained`: grid 0 -> field size, non-numeric
+      `positionText` -> NaN). Tests in `tests/test_features.py` pass for all driver features.
+- [x] Team rolling finish and positions gained: aggregate to one row per team per race first,
+      then shift/roll (otherwise the teammate's same-race result leaks in). All feature tests pass,
+      including the leakage test.
+- [ ] NEXT: `features/build.py`: load once, sort once, call each feature as `add_xxx(df)`, merge
+      the team features back onto driver rows on `(season, round, constructorId)`.
 - [ ] Qualifying/grid position, treating grid 0 as last.
 - [ ] Driver rolling finish over 3 and 5 races, and DNF rate.
 - [ ] Constructor rolling finish and points.
@@ -53,7 +60,7 @@ walk-forward backtest before any dashboard work starts.
 - [ ] Save models with joblib to `data/processed/models/`.
 
 ### Step 4: Walk-forward backtest (`src/f1_predictions/evaluate/backtest.py`)
-- [ ] For each race in 2024â€“2026, train only on earlier races and predict that race. Never split
+- [ ] For each race in 2024-2026, train only on earlier races and predict that race. Never split
       randomly.
 - [ ] Report MAE, Spearman rank correlation per race, podium hit rate and Brier score, for the model
       and the baseline side by side.
@@ -67,6 +74,9 @@ walk-forward backtest before any dashboard work starts.
 ## Session log
 
 Add one line per working session, newest first.
+
+- 2026-11-12: Tidied `load_merged()`; rolling 3-race average finish works. Chose a rolling
+  (not season) average for positions gained, as the next feature.
 
 - 2026-11-12: Fixed `ModuleNotFoundError` (reran `pip install -e ".[dev]"` in `.venv`). Loaded and
   merged both tables in `features/merge_tables.py`. README brought up to date. Next: rolling
